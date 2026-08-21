@@ -1,0 +1,11 @@
+# Direct dependencies only — see architecture.md section 1.
+# Nothing is added here without explicit approval.
+
+# Pinned to 5.2 LTS: the local PostgreSQL is 14, and Django 6.1+ requires 15+.
+# Raising this pin means upgrading PostgreSQL first. See architecture.md section 1.
+Django==5.2.9
+djangorestframework==3.18.0
+psycopg[binary]==3.3.4
+django-cors-headers==4.9.0
+django-filter==26.1
+django-environ==0.14.0
