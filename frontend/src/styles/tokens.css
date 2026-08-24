@@ -1,0 +1,140 @@
+/**
+ * SkilloVilla design tokens.
+ *
+ * Ported from the Claude Design project "Invoice management system design"
+ * (_ds/skillovilla-design-system-.../tokens/*.css). Values are copied exactly —
+ * do not hand-tune them here; change the design system and re-port.
+ *
+ * Hard rules from the system readme, section 4:
+ *   - The violet->amber gradient is ONLY ever a 4px rule. Never a background,
+ *     never a button fill, never behind text.
+ *   - Amber is accent only. In this app it means one thing: a field the PDF
+ *     extractor read with low confidence, on /invoices/upload/review and
+ *     nowhere else. Overdue is NOT amber — it is a danger state, --danger.
+ *   - Buttons are always pill. Cards 12px, inputs 8px, dialogs 16px.
+ *   - Focus is a 3px violet ring, never removed.
+ *   - No second typeface. No emoji, anywhere.
+ */
+
+/* Figtree is a VARIABLE font — one file carries the whole 300-900 axis, so the
+   weight is declared as a range rather than one @font-face per weight. */
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/Figtree-latin.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/Figtree-latin-ext.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* ---- Brand: Violet (logo mark + wordmark accent) ---- */
+  --violet-50: #f6f0ff;  --violet-100: #ede1fe; --violet-200: #dcc4fd;
+  --violet-300: #c49cfc; --violet-400: #ac6bfe; --violet-500: #9431fe;
+  --violet-600: #7a1ae0; --violet-700: #5f13af; --violet-800: #45107c;
+  --violet-900: #340a62; --violet-950: #240743;
+
+  /* ---- Brand: Amber (upper half of the logo mark) ---- */
+  --amber-50: #fff7e6;  --amber-100: #ffecc2; --amber-200: #ffdc8a;
+  --amber-300: #ffc94f; --amber-400: #ffb524; --amber-500: #ffa800;
+  --amber-600: #db8a00; --amber-700: #a96700; --amber-800: #7a4a00;
+  --amber-900: #4f3000;
+
+  /* ---- Ink & neutrals (plum-tinted, keyed to the wordmark ink) ---- */
+  --ink-950: #1a1620; --ink-900: #2b2531; --ink-800: #45404f; --ink-700: #625c6e;
+  --ink-600: #8a8496; --ink-500: #b6b1bf; --ink-400: #d9d6df; --ink-300: #eae8ee;
+  --ink-200: #f4f3f6; --ink-100: #fafafb; --white: #ffffff;
+
+  /* ---- Semantic hues ---- */
+  --green-100: #e3f7ec; --green-500: #12a150; --green-700: #0b6f37;
+  --red-100: #fdeaea;   --red-500: #e5484d;   --red-700: #b3282d;
+  --blue-100: #e8f0fe;  --blue-500: #2e7cf6;  --blue-700: #1a56b8;
+
+  /* ---- Semantic aliases ---- */
+  --brand: var(--violet-500); --brand-strong: var(--violet-600);
+  --brand-deep: var(--violet-900); --brand-soft: var(--violet-50);
+  --brand-accent: var(--amber-500);
+
+  --text-strong: var(--ink-900); --text-body: var(--ink-800);
+  --text-muted: var(--ink-700); --text-subtle: var(--ink-600);
+  --text-on-brand: var(--white); --text-link: var(--violet-600);
+  --text-link-hover: var(--violet-700);
+
+  --surface-page: var(--white); --surface-page-alt: var(--ink-100);
+  --surface-card: var(--white); --surface-sunken: var(--ink-200);
+  --surface-brand-tint: var(--violet-50); --surface-brand-deep: var(--violet-900);
+  --surface-accent-tint: var(--amber-50); --surface-overlay: rgba(26, 22, 32, 0.55);
+  --surface-slide-band: #f2ebfb;
+
+  --border-subtle: var(--ink-300); --border-default: var(--ink-400);
+  --border-strong: var(--ink-500); --border-brand: var(--violet-500);
+  --focus-ring: rgba(148, 49, 254, 0.35);
+
+  --success: var(--green-500); --success-tint: var(--green-100);
+  --warning: var(--amber-500); --warning-tint: var(--amber-50);
+  --danger: var(--red-500);    --danger-tint: var(--red-100);
+  --danger-strong: var(--red-700);
+  --info: var(--blue-500);     --info-tint: var(--blue-100);
+
+  /* The logo's violet->amber sweep. 4px rule ONLY. */
+  --gradient-brand: linear-gradient(90deg, var(--violet-600) 0%, var(--violet-500) 45%, var(--amber-500) 100%);
+
+  /* ---- Type ---- */
+  --font-sans: "Figtree", -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600;
+  --fw-bold: 700; --fw-extrabold: 800; --fw-black: 900;
+
+  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-16: 16px;
+  --fs-18: 18px; --fs-20: 20px; --fs-24: 24px; --fs-30: 30px; --fs-38: 38px;
+  --fs-48: 48px;
+
+  --lh-tight: 1.1; --lh-snug: 1.25; --lh-normal: 1.45; --lh-relaxed: 1.6;
+  --ls-tight: -0.02em; --ls-snug: -0.01em; --ls-caps: 0.08em;
+
+  --type-h1: var(--fw-bold) var(--fs-38) / var(--lh-tight) var(--font-display);
+  --type-h2: var(--fw-bold) var(--fs-30) / var(--lh-snug) var(--font-display);
+  --type-h3: var(--fw-semibold) var(--fs-24) / var(--lh-snug) var(--font-sans);
+  --type-h4: var(--fw-semibold) var(--fs-20) / var(--lh-snug) var(--font-sans);
+  --type-lead: var(--fw-regular) var(--fs-18) / var(--lh-relaxed) var(--font-sans);
+  --type-body: var(--fw-regular) var(--fs-16) / var(--lh-normal) var(--font-sans);
+  --type-body-sm: var(--fw-regular) var(--fs-14) / var(--lh-normal) var(--font-sans);
+  --type-label: var(--fw-semibold) var(--fs-13) / var(--lh-snug) var(--font-sans);
+  --type-caption: var(--fw-medium) var(--fs-12) / var(--lh-snug) var(--font-sans);
+  --type-eyebrow: var(--fw-bold) var(--fs-11) / var(--lh-snug) var(--font-sans);
+
+  /* ---- Spacing: 8px working unit, 2 and 4 for optical nudges (readme sec. 4) ---- */
+  --sp-2: 2px; --sp-4: 4px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px;
+  --sp-20: 20px; --sp-24: 24px; --sp-32: 32px; --sp-40: 40px; --sp-48: 48px;
+  --sp-64: 64px;
+  --container: 1180px;
+
+  /* ---- Shape ---- */
+  --radius-chip: 6px; --radius-input: 8px; --radius-card: 12px;
+  --radius-dialog: 16px; --radius-pill: 999px;
+
+  /* ---- Elevation: plum-tinted ---- */
+  --shadow-xs: 0 1px 2px rgba(26, 22, 32, 0.05);
+  --shadow-sm: 0 1px 3px rgba(26, 22, 32, 0.08);
+  --shadow-md: 0 4px 12px rgba(26, 22, 32, 0.1);
+  --shadow-lg: 0 12px 32px rgba(26, 22, 32, 0.16);
+  --shadow-brand: 0 4px 14px rgba(148, 49, 254, 0.32);
+
+  /* ---- Motion: one curve everywhere ---- */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms; --dur-mid: 220ms; --dur-slow: 360ms;
+}

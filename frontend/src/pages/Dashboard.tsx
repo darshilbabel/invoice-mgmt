@@ -3,10 +3,14 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { daysLate } from "../lib/money";
 import type { Dashboard as DashboardData } from "../types";
 
+/** Wireframe 1a — four tiles mapping 1:1 to the /api/dashboard/ payload, then
+ *  the recent invoices. Nothing on this screen lacks an endpoint behind it. */
 export default function Dashboard() {
   const { user } = useAuth();
+  const canWrite = user?.role === "ADMIN" || user?.role === "STAFF";
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,68 +22,78 @@ export default function Dashboard() {
       .catch((e: unknown) =>
         !cancelled && setError(e instanceof Error ? e.message : "Failed to load."),
       );
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  if (error) return <p role="alert">{error}</p>;
-  if (!data) return <p>Loading…</p>;
+  if (error) return <p role="alert" className="notice notice-danger">{error}</p>;
+  if (!data) return <p className="muted">Loading…</p>;
 
   return (
-    <section>
-      <h1>Dashboard</h1>
-      {user?.role === "STAFF" && (
-        <p className="muted">Showing invoices you created.</p>
-      )}
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Dashboard</h1>
+          {user?.role === "STAFF" && (
+            <p className="muted" style={{ margin: "var(--sp-4) 0 0", font: "var(--type-body-sm)" }}>
+              Showing invoices you created.
+            </p>
+          )}
+        </div>
+        {canWrite && <Link className="btn" to="/invoices/new">New invoice</Link>}
+      </div>
 
       <div className="tiles">
         <Tile label="Invoices" value={String(data.invoice_count)} />
-        {/* grand_total is a string from the API and is rendered verbatim —
-            never parsed into a number. See architecture.md section 7. */}
+        {/* Totals print the API string verbatim — never reformatted. */}
         <Tile label="Total billed" value={data.grand_total} />
-        <Tile label="Overdue" value={String(data.overdue_count)} />
+        <Tile label="Overdue" value={String(data.overdue_count)} danger={data.overdue_count > 0} />
         <Tile label="Customers" value={String(data.customer_count)} />
       </div>
 
-      <h2>Recent invoices</h2>
+      <div className="row-between" style={{ marginBottom: "var(--sp-12)" }}>
+        <h2>Recent invoices</h2>
+        <Link to="/invoices" className="btn-ghost" style={{ font: "var(--type-label)" }}>View all</Link>
+      </div>
+
       {data.recent_invoices.length === 0 ? (
-        <p className="muted">No invoices yet.</p>
+        <p className="notice notice-muted">No invoices yet.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Invoice</th>
-              <th>Customer</th>
-              <th>Due</th>
-              <th className="right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.recent_invoices.map((invoice) => (
-              <tr key={invoice.id}>
-                <td>
-                  <Link to={`/invoices/${invoice.id}/edit`}>
-                    {invoice.invoice_number}
-                  </Link>
-                </td>
-                <td>{invoice.customer.name}</td>
-                <td>{invoice.due_date}</td>
-                <td className="right">{invoice.total}</td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice</th><th>Customer</th><th>Issued</th><th>Due</th><th className="right">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.recent_invoices.map((invoice) => {
+                const late = daysLate(invoice.due_date);
+                return (
+                  <tr key={invoice.id}>
+                    <td><Link className="cell-strong" to={`/invoices/${invoice.id}`}>{invoice.invoice_number}</Link></td>
+                    <td>{invoice.customer.name}</td>
+                    <td className="num">{invoice.issue_date}</td>
+                    <td className="num">
+                      {invoice.due_date}{" "}
+                      {late > 0 && <span className="badge badge-danger">{late}d late</span>}
+                    </td>
+                    <td className="right num cell-strong">{invoice.total}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
-    </section>
+    </>
   );
 }
 
-function Tile({ label, value }: { label: string; value: string }) {
+function Tile({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
   return (
     <div className="tile">
       <span className="tile-label">{label}</span>
-      <strong className="tile-value">{value}</strong>
+      <span className={`tile-value${danger ? " is-danger" : ""}`}>{value}</span>
     </div>
   );
 }

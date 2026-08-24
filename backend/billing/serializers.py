@@ -22,6 +22,48 @@ class CustomerSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at")
 
 
+class ExtractedLineSerializer(serializers.Serializer):
+    """One line item as read off a PDF. Output only — nothing is saved from here."""
+
+    description = serializers.CharField(allow_blank=True)
+    # DecimalFields, not CharFields: this is what makes money leave as a quoted
+    # 2dp string. See conventions.md, Money.
+    quantity = serializers.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class InvoiceExtractionSerializer(serializers.Serializer):
+    """The response of POST /api/invoices/extract/.
+
+    Output only, and it persists nothing: the user reviews this, corrects it, and
+    then the ordinary POST /api/invoices/ writes the invoice. The one exception is
+    `customer`, which is a real row by the time this is rendered — see
+    InvoiceViewSet.extract and open question 4 in docs/specs/2026-08-ocr-ingest.md.
+    """
+
+    customer = serializers.IntegerField(allow_null=True)
+    customer_created = serializers.BooleanField()
+    customer_detail = CustomerSerializer(allow_null=True)
+
+    # Printed on the supplier's PDF. Shown for reference and then discarded —
+    # Invoice.invoice_number is derived from the pk and has no column to take it.
+    source_invoice_number = serializers.CharField(allow_null=True)
+    issue_date = serializers.DateField(allow_null=True)
+    due_date = serializers.DateField(allow_null=True)
+    notes = serializers.CharField(allow_blank=True)
+    transactions = ExtractedLineSerializer(many=True)
+
+    # A cross-check against the sum of the rows above, never the invoice's total.
+    # domain.md's rule is unaffected: the total is still computed from line items.
+    printed_total = serializers.DecimalField(
+        max_digits=14, decimal_places=2, allow_null=True
+    )
+
+    low_confidence = serializers.ListField(child=serializers.CharField())
+    field_notes = serializers.DictField(child=serializers.CharField())
+    page_count = serializers.IntegerField()
+
+
 class TransactionSerializer(serializers.ModelSerializer):
     """Nested inside InvoiceSerializer. No `invoice` field — the parent supplies it."""
 

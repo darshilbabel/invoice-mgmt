@@ -54,19 +54,15 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+/** The single place a fetch happens. Everything else here builds an init for it. */
+async function send<T>(path: string, init: RequestInit): Promise<T> {
   const token = getToken();
   const response = await fetch(`${BASE_URL}${path}`, {
-    method,
+    ...init,
     headers: {
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(init.headers ?? {}),
       ...(token ? { Authorization: `Token ${token}` } : {}),
     },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
   // A 401 means "your session is invalid" only if we actually presented a
@@ -86,10 +82,30 @@ async function request<T>(
   return payload as T;
 }
 
+function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return send<T>(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
   delete: <T>(path: string) => request<T>("DELETE", path),
+
+  /**
+   * Multipart POST, for file uploads. Deliberately sets NO Content-Type — the
+   * browser has to write it itself so the multipart boundary in the header
+   * matches the one in the body. Setting it by hand produces a request the
+   * server cannot parse, with no useful error.
+   *
+   * `signal` is here because uploads are the only requests slow enough to be
+   * worth cancelling.
+   */
+  upload: <T>(path: string, form: FormData, signal?: AbortSignal) =>
+    send<T>(path, { method: "POST", body: form, signal }),
 };
