@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,6 +27,10 @@ env = environ.Env(
     CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173"]),
 )
 environ.Env.read_env(BASE_DIR / ".env")
+# The repo root as a fallback, for values kept alongside the frontend's own config
+# rather than in backend/. read_env never overwrites something already set, so
+# backend/.env still wins wherever both define a name.
+environ.Env.read_env(BASE_DIR.parent / ".env")
 
 
 # Required — no default, so a missing SECRET_KEY fails loudly rather than
@@ -181,3 +186,33 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/topics/email/#topic-email-configuration
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
+# Invoice PDF extraction — see docs/specs/2026-08-ocr-ingest.md
+#
+# Required, exactly like SECRET_KEY: a secret comes from .env or the process
+# refuses to start. A default here would let the server boot and then fail on the
+# first upload instead, which is a worse place to find out.
+#
+# Either spelling is accepted. OPENAI_API_KEY is the name the OpenAI SDK itself
+# reads from the environment, so it is what most people write; OPENAI_KEY is the
+# shorter form. Taking both costs one line and saves a confusing startup crash.
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="") or env("OPENAI_KEY", default="")
+if not OPENAI_API_KEY:
+    raise ImproperlyConfigured(
+        "Set OPENAI_API_KEY (or OPENAI_KEY) in backend/.env. "
+        "Invoice PDF extraction cannot run without it — see "
+        "docs/specs/2026-08-ocr-ingest.md."
+    )
+
+# The PDF is sent to the model as a file, so this has to be a model that accepts
+# file input. Overridable without a code change when a better one ships.
+OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o")
+
+# A model call on a multi-page invoice is slow, and the request blocks for its
+# whole duration — there is no job queue in this project.
+OPENAI_TIMEOUT_SECONDS = env.int("OPENAI_TIMEOUT_SECONDS", default=90)
+
+# The real limit. The browser checks the same number first, but that is a courtesy
+# to save a round trip, not a control.
+INVOICE_UPLOAD_MAX_BYTES = env.int("INVOICE_UPLOAD_MAX_BYTES", default=10 * 1024 * 1024)

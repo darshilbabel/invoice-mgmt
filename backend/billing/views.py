@@ -1,20 +1,76 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import DecimalField, ExpressionWrapper, F, Sum
 from django.db.models.functions import Coalesce, Round
 from django.utils import timezone
-from rest_framework import serializers, viewsets
+from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import RolePermission, RoleScopedQuerysetMixin, scope_to_role
 
+from .extraction import ExtractionError, extract_invoice_fields
+from .filters import InvoiceFilter
 from .models import Customer, Invoice, Transaction
 from .serializers import (
     CustomerSerializer,
+    InvoiceExtractionSerializer,
     InvoiceSerializer,
     TransactionDetailSerializer,
 )
+
+# Every PDF starts with these five bytes. Checked instead of trusting the
+# extension or the client-supplied content type, both of which the client picks.
+PDF_MAGIC = b"%PDF-"
+
+
+def _bad_request(message):
+    """The shape DRF uses for auth and permission errors, so the client's existing
+    ApiError flattening renders it without a special case."""
+    return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _resolve_customer(guess):
+    """Find the Customer an extracted supplier refers to, creating it if new.
+
+    Returns (customer, created). Matching is email first — the one field on an
+    invoice that is actually meant to be unique — then the printed name against
+    both `name` and `company_name`, since suppliers put either on the page.
+
+    NOTE: this creates rows. That reverses the rule this spec originally stated
+    ("extraction never creates a Customer implicitly") and was chosen knowingly:
+    the cost is that uploading a PDF and then discarding it still leaves a
+    customer behind, and Customer is on_delete=PROTECT, so tidying up is manual.
+    See open question 4 in docs/specs/2026-08-ocr-ingest.md.
+    """
+    if not guess or not guess.get("name"):
+        return None, False
+
+    email = (guess.get("email") or "").strip()
+    if email:
+        existing = Customer.objects.filter(email__iexact=email).first()
+        if existing:
+            return existing, False
+
+    name = guess["name"].strip()
+    existing = (
+        Customer.objects.filter(name__iexact=name).first()
+        or Customer.objects.filter(company_name__iexact=name).first()
+    )
+    if existing:
+        return existing, False
+
+    return (
+        Customer.objects.create(
+            name=name,
+            email=email,
+            billing_address=(guess.get("billing_address") or "").strip(),
+        ),
+        True,
+    )
 
 # Money crosses the wire as a 2dp string everywhere (architecture.md section 7).
 # A bare Decimal in a Response dict bypasses DRF's COERCE_DECIMAL_TO_STRING and
@@ -54,7 +110,7 @@ class InvoiceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = InvoiceSerializer
     permission_classes = [RolePermission]
 
-    filterset_fields = ("customer", "issue_date", "due_date")
+    filterset_class = InvoiceFilter
     search_fields = ("customer__name", "customer__company_name", "notes")
     # `total` is deliberately absent: it is a Python property, not a column, so
     # the database cannot sort by it. See architecture.md section 4.
@@ -63,6 +119,54 @@ class InvoiceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Ownership comes from the request, never the payload.
         serializer.save(created_by=self.request.user)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="extract",
+        parser_classes=[MultiPartParser],
+    )
+    def extract(self, request):
+        """POST /api/invoices/extract/ — read a PDF, return fields, save no invoice.
+
+        An @action rather than its own path() so it inherits RolePermission (a
+        POST, so VIEWER is refused for free) and so the router places it ahead of
+        invoices/<pk>/ — registered after the router, `extract` would be swallowed
+        by the detail route, whose default lookup regex matches any non-slash run.
+
+        No invoice and no transaction is written here. The user reviews what comes
+        back and the ordinary POST /api/invoices/ does the writing.
+        """
+        upload = request.FILES.get("file")
+        if upload is None:
+            return _bad_request("No file was uploaded. Send one PDF as `file`.")
+
+        limit = settings.INVOICE_UPLOAD_MAX_BYTES
+        if upload.size > limit:
+            return _bad_request(
+                f"{upload.name} is larger than the {limit // (1024 * 1024)} MB limit."
+            )
+
+        content = upload.read()
+        if not content.startswith(PDF_MAGIC):
+            return _bad_request(f"{upload.name} is not a PDF.")
+
+        try:
+            extracted = extract_invoice_fields(content, upload.name)
+        except ExtractionError as exc:
+            # A 400 with a readable message, never a 500 — the frontend renders
+            # `detail` verbatim on its failure screen (conventions.md, Errors).
+            return _bad_request(exc.message)
+
+        customer, created = _resolve_customer(extracted.pop("customer_guess", None))
+
+        payload = {
+            **extracted,
+            "customer": customer.pk if customer else None,
+            "customer_created": created,
+            "customer_detail": customer,
+        }
+        return Response(InvoiceExtractionSerializer(payload).data)
 
 
 class TransactionViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):

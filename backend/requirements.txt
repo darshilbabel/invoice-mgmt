@@ -9,3 +9,8 @@ psycopg[binary]==3.3.4
 django-cors-headers==4.9.0
 django-filter==26.1
 django-environ==0.14.0
+
+# Reads uploaded invoice PDFs. Approved 2026-08-24 as the answer to open question 1
+# in docs/specs/2026-08-ocr-ingest.md — the PDF goes to the model as a file, so this
+# is the ONLY dependency that feature needs: no OCR library, no PDF parser.
+openai==3.3.1

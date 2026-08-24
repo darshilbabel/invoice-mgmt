@@ -94,3 +94,51 @@ export interface LoginResponse {
   token: string;
   user: User;
 }
+
+/** billing.serializers.InvoiceExtractionSerializer — POST /api/invoices/extract/ */
+
+/**
+ * Where a value sits in an ExtractionResult, for flagging low confidence:
+ * "due_date", or "transactions.2.quantity" for the third line's quantity.
+ */
+export type ExtractionFieldPath = string;
+
+export interface ExtractionResult {
+  /**
+   * The customer this invoice was resolved to — a real row by the time this
+   * arrives. `customer_created` says whether the backend had to make it, which
+   * the review screen tells the user plainly.
+   */
+  customer: number | null;
+  customer_created: boolean;
+  customer_detail: Customer | null;
+  /**
+   * The number printed on the supplier's PDF. Displayed for reference and
+   * discarded — Invoice.invoice_number is derived from the pk (domain.md) and
+   * has no column to write this into.
+   */
+  source_invoice_number: string | null;
+  issue_date: string | null;
+  due_date: string | null;
+  notes: string;
+  transactions: TransactionInput[];
+  /**
+   * The total printed on the PDF, as a cross-check against the sum of the rows
+   * above. NEVER authoritative and never sent anywhere: a disagreement means
+   * the rows were misread. The app's total is always computed — domain.md's
+   * one load-bearing rule.
+   */
+  printed_total: string | null;
+  /** Field paths the extractor was unsure about. Still filled in, still saved. */
+  low_confidence: ExtractionFieldPath[];
+  /** Per-field explanation, keyed by the same paths. Only flagged paths appear. */
+  field_notes: Record<ExtractionFieldPath, string>;
+  page_count: number;
+}
+
+/** Not a serializer shape — the client's own union for a readable failure. */
+export interface ExtractionFailure {
+  reason: "no_text" | "too_large" | "not_pdf" | "timeout";
+  /** Already human-readable — render it directly, like ApiError.message. */
+  message: string;
+}

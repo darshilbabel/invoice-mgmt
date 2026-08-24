@@ -1,0 +1,34 @@
+# Environment files — contain SECRET_KEY, DATABASE_URL. Never commit these.
+# See backend/.env.example and frontend/.env.example for the template.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+.venv/
+venv/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+npm-debug.log*
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code local overrides (keep the shared settings.json, ignore local one)
+.claude/settings.local.json
