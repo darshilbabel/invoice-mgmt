@@ -1,0 +1,3283 @@
+{
+  "info": {
+    "name": "invoice-mgmt API",
+    "_postman_id": "8f3b1c42-6d7a-4e58-9b21-invoicemgmt01",
+    "description": "API test suite for the invoice-mgmt Django + DRF backend.\n\nRun the folders IN ORDER - 00 Setup captures the three role tokens and creates the fixtures every later folder depends on, and 99 Teardown removes them and asserts the database is back where it started.\n\nBefore the first run, seed the three role accounts:\n    cd backend && python manage.py shell < ../postman/seed_test_users.py\n\nRequests named 'KNOWN GAP:' assert the API's CURRENT behaviour at a point where it is wrong or surprising. They are green today. When one goes red, the underlying gap was fixed - update the test, do not revert the fix.\n\nSee postman/README.md for the newman command and for the two extract tests that are documented but deliberately not shipped.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 Setup",
+      "item": [
+        {
+          "name": "Log in as ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "Captures the token into a collection variable for every later request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"returns a token and a user\", () => {",
+                  "    pm.expect(j.token, \"token\").to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(j.user, \"user\").to.be.an(\"object\");",
+                  "});",
+                  "pm.test(\"role is ADMIN\", () => pm.expect(j.user.role).to.equal(\"ADMIN\"));",
+                  "pm.test(\"the password is never echoed back\", () => pm.expect(j.user).to.not.have.property(\"password\"));",
+                  "pm.collectionVariables.set(\"admin_token\", j.token);",
+                  "pm.collectionVariables.set(\"admin_user_id\", j.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as STAFF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "Captures the token into a collection variable for every later request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"returns a token and a user\", () => {",
+                  "    pm.expect(j.token, \"token\").to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(j.user, \"user\").to.be.an(\"object\");",
+                  "});",
+                  "pm.test(\"role is STAFF\", () => pm.expect(j.user.role).to.equal(\"STAFF\"));",
+                  "pm.test(\"the password is never echoed back\", () => pm.expect(j.user).to.not.have.property(\"password\"));",
+                  "pm.collectionVariables.set(\"staff_token\", j.token);",
+                  "pm.collectionVariables.set(\"staff_user_id\", j.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as VIEWER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "Captures the token into a collection variable for every later request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{viewer_email}}\",\n  \"password\": \"{{viewer_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"returns a token and a user\", () => {",
+                  "    pm.expect(j.token, \"token\").to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(j.user, \"user\").to.be.an(\"object\");",
+                  "});",
+                  "pm.test(\"role is VIEWER\", () => pm.expect(j.user.role).to.equal(\"VIEWER\"));",
+                  "pm.test(\"the password is never echoed back\", () => pm.expect(j.user).to.not.have.property(\"password\"));",
+                  "pm.collectionVariables.set(\"viewer_token\", j.token);",
+                  "pm.collectionVariables.set(\"viewer_user_id\", j.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot the invoice-count baseline",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "Teardown asserts these are restored, proving the suite cleans up after itself."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"baseline_invoice_count\", j.invoice_count);",
+                  "pm.collectionVariables.set(\"baseline_customer_count\", j.customer_count);",
+                  "console.log(\"baseline invoices=\" + j.invoice_count + \" customers=\" + j.customer_count);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create the fixture customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/customers/",
+            "description": "Every invoice this run creates points at this customer, so teardown can find them all.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Fixture Co\",\n  \"email\": \"fixture@postman.local\",\n  \"company_name\": \"Postman Fixture Co Ltd\",\n  \"billing_address\": \"1 Test Street\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"echoes the fields back\", () => {",
+                  "    pm.expect(j.name).to.equal(\"Postman Fixture Co\");",
+                  "    pm.expect(j.email).to.equal(\"fixture@postman.local\");",
+                  "});",
+                  "pm.test(\"id, created_at and updated_at are server-assigned\", () => {",
+                  "    pm.expect(j.id).to.be.a(\"number\");",
+                  "    pm.expect(j).to.have.property(\"created_at\");",
+                  "    pm.expect(j).to.have.property(\"updated_at\");",
+                  "});",
+                  "pm.collectionVariables.set(\"customer_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create an ADMIN-owned invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Design work\",\n      \"quantity\": \"2.5\",\n      \"unit_price\": \"100.00\"\n    },\n    {\n      \"description\": \"Hosting\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"50.00\"\n    }\n  ],\n  \"issue_date\": \"2026-08-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"total is computed from the line items (2.5x100 + 1x50)\", () => pm.expect(j.total).to.equal(\"300.00\"));",
+                  "pm.test(\"created_by is the ADMIN who sent the request\", () => pm.expect(j.created_by.email).to.equal(pm.environment.get(\"admin_email\")));",
+                  "pm.collectionVariables.set(\"admin_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a STAFF-owned invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "STAFF ownership is what folder 02 uses to prove role scoping.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Consulting\",\n      \"quantity\": \"3\",\n      \"unit_price\": \"25.00\"\n    },\n    {\n      \"description\": \"Postage\",\n      \"quantity\": \"0.5\",\n      \"unit_price\": \"1.00\"\n    }\n  ],\n  \"issue_date\": \"2026-08-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"total is computed from the line items (3x25 + 0.5x1)\", () => pm.expect(j.total).to.equal(\"75.50\"));",
+                  "pm.test(\"created_by is the STAFF user, not the ADMIN\", () => pm.expect(j.created_by.email).to.equal(pm.environment.get(\"staff_email\")));",
+                  "pm.collectionVariables.set(\"staff_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Logs in as all three roles and creates the fixtures. Must run first."
+    },
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "Login with the wrong password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "docs: a wrong password must be 401. DRF downgrades 401 to 403 when a view exposes no authenticator.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"definitely-not-the-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"401, not 403 - LoginView leaves authentication_classes at the default so DRF can send a 401\", () => {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "pm.test(\"message does not say whether the account exists\", () => pm.expect(pm.response.json().detail).to.equal(\"Invalid email or password.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with an unknown email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nobody@invoice.local\",\n  \"password\": \"whatever123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"identical message to a wrong password - no account enumeration\", () => pm.expect(pm.response.json().detail).to.equal(\"Invalid email or password.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with a missing password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "DRF's second error shape: {field: [messages]}. The frontend ApiError flattens both.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"field-keyed validation shape, not {detail}\", () => {",
+                  "    pm.expect(j).to.have.property(\"password\");",
+                  "    pm.expect(j.password).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login with a malformed email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"whatever123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));pm.test(\"email field is flagged\", () => pm.expect(pm.response.json()).to.have.property(\"email\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I - ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"role is ADMIN\", () => pm.expect(j.role).to.equal(\"ADMIN\"));",
+                  "pm.test(\"exposes only id, email, full_name, role\", () => pm.expect(Object.keys(j).sort()).to.eql([\"email\", \"full_name\", \"id\", \"role\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I - STAFF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"role is STAFF\", () => pm.expect(j.role).to.equal(\"STAFF\"));",
+                  "pm.test(\"exposes only id, email, full_name, role\", () => pm.expect(Object.keys(j).sort()).to.eql([\"email\", \"full_name\", \"id\", \"role\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I - VIEWER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"role is VIEWER\", () => pm.expect(j.role).to.equal(\"VIEWER\"));",
+                  "pm.test(\"exposes only id, email, full_name, role\", () => pm.expect(Object.keys(j).sort()).to.eql([\"email\", \"full_name\", \"id\", \"role\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I - no Authorization header",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));pm.test(\"standard DRF detail\", () => pm.expect(pm.response.json().detail).to.equal(\"Authentication credentials were not provided.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Who am I - garbage token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token 0000000000000000000000000000000000000000"
+              }
+            ],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));pm.test(\"token is rejected\", () => pm.expect(pm.response.json().detail).to.equal(\"Invalid token.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log out the VIEWER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/auth/logout/",
+            "description": "Logout is a real server-side revocation - it deletes the token row."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));pm.test(\"empty body\", () => pm.expect(pm.response.text()).to.be.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The revoked VIEWER token no longer works",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/auth/me/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"the token was revoked server-side, not just forgotten by the client\", () => pm.expect(pm.response.json().detail).to.equal(\"Invalid token.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log the VIEWER back in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "description": "Restores viewer_token for the folders that follow.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{viewer_email}}\",\n  \"password\": \"{{viewer_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"a fresh token is issued\", () => pm.expect(j.token).to.be.a(\"string\").and.not.empty);",
+                  "pm.collectionVariables.set(\"viewer_token\", j.token);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Login, identity, and that logout is a real server-side token revocation."
+    },
+    {
+      "name": "02 Permissions and role scoping",
+      "item": [
+        {
+          "name": "ADMIN can list users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/users/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"paginated envelope\", () => pm.expect(j).to.have.all.keys(\"count\", \"next\", \"previous\", \"results\"));",
+                  "pm.test(\"no password hash is ever serialised\", () => j.results.forEach(u => pm.expect(u).to.not.have.property(\"password\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF cannot list users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/users/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot list users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/users/",
+            "description": "/api/users/ is guarded by IsAdminRole, not RolePermission - even a read is ADMIN-only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER can read invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "VIEWER is read-all / write-nothing. This is the widest read surface in the app."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"VIEWER sees every invoice, not just its own\", () => pm.expect(pm.response.json().count).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER can read customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot create a customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/customers/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Should Not Exist\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot update a customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/customers/{{customer_id}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Should Not Change\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot delete a customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/{{customer_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot create an invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot create a transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/transactions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice\": \"{{staff_invoice_id}}\",\n  \"description\": \"no\",\n  \"quantity\": \"1\",\n  \"unit_price\": \"1.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF can create a customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/customers/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Staff-Made Co\",\n  \"email\": \"staffmade@postman.local\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"staff_customer_id\", pm.response.json().id);",
+                  "pm.test(\"customers are writable by STAFF as well as ADMIN\", () => pm.expect(pm.response.json().name).to.equal(\"Postman Staff-Made Co\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF sees only its own invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "scope_to_role() narrows the queryset on created_by for STAFF only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const staffEmail = pm.environment.get(\"staff_email\");",
+                  "pm.test(\"every row is owned by the STAFF user\", () => {",
+                  "    pm.expect(j.results.length, \"expected at least one STAFF invoice\").to.be.above(0);",
+                  "    j.results.forEach(inv => pm.expect(inv.created_by.email).to.equal(staffEmail));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF gets 404, not 403, on another owner's invoice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{admin_invoice_id}}/",
+            "description": "Deliberate, per docs/conventions.md. Do not 'fix' this to a 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"404 rather than 403 - a 403 would confirm the row exists\", () => {",
+                  "    pm.expect(pm.response.code).to.equal(404);",
+                  "    pm.expect(pm.response.json().detail).to.equal(\"No Invoice matches the given query.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF cannot update another owner's invoice",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{admin_invoice_id}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"hijack\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"1.00\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF cannot delete another owner's invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{admin_invoice_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "created_by cannot be forged through the payload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "perform_create() sets created_by from request.user. A user can never assign an invoice to someone else.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"created_by\": \"{{admin_user_id}}\",\n  \"transactions\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"ownership comes from the request user, not the body\", () => {",
+                  "    pm.expect(j.created_by.email).to.equal(pm.environment.get(\"staff_email\"));",
+                  "    pm.expect(String(j.created_by.id)).to.not.equal(String(pm.collectionVariables.get(\"admin_user_id\")));",
+                  "});",
+                  "pm.collectionVariables.set(\"forged_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF cannot attach a line to an invoice it cannot read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/transactions/",
+            "description": "The standalone transactions endpoint exposes a writable FK, so it validates ownership itself.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice\": \"{{admin_invoice_id}}\",\n  \"description\": \"sneak\",\n  \"quantity\": \"1\",\n  \"unit_price\": \"1.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"validate_invoice() blocks the write - queryset narrowing alone would not\", () => {",
+                  "    pm.expect(pm.response.json().invoice[0]).to.equal(\"Invoice not found.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "STAFF can attach a line to its own invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/transactions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoice\": \"{{staff_invoice_id}}\",\n  \"description\": \"Extra line\",\n  \"quantity\": \"2\",\n  \"unit_price\": \"5.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"line_total is computed and 2dp\", () => pm.expect(j.line_total).to.equal(\"10.00\"));",
+                  "pm.collectionVariables.set(\"standalone_txn_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "The ADMIN / STAFF / VIEWER matrix, including STAFF's 404-not-403 and the two places a write could escape its scope."
+    },
+    {
+      "name": "03 Invoices and the money rule",
+      "item": [
+        {
+          "name": "Create an invoice with nested line items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "The load-bearing rule: totals are computed from transactions, never stored.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Design work\",\n      \"quantity\": \"2.5\",\n      \"unit_price\": \"100.00\"\n    },\n    {\n      \"description\": \"Hosting\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"50.00\"\n    }\n  ],\n  \"issue_date\": \"2026-08-01\",\n  \"notes\": \"money-rule fixture\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"every money value crosses the wire as a STRING, never a JSON number\", () => {",
+                  "    pm.expect(j.total, \"total\").to.be.a(\"string\");",
+                  "    j.transactions.forEach((t, i) => {",
+                  "        pm.expect(t.quantity, \"transactions[\" + i + \"].quantity\").to.be.a(\"string\");",
+                  "        pm.expect(t.unit_price, \"transactions[\" + i + \"].unit_price\").to.be.a(\"string\");",
+                  "        pm.expect(t.line_total, \"transactions[\" + i + \"].line_total\").to.be.a(\"string\");",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test(\"total is computed, not echoed: 2.5x100 + 1x50 = 300.00\", () => pm.expect(j.total).to.equal(\"300.00\"));",
+                  "pm.test(\"total equals the sum of the line totals\", () => {",
+                  "    const cents = j.transactions.reduce((s, t) => s + Math.round(parseFloat(t.line_total) * 100), 0);",
+                  "    pm.expect((cents / 100).toFixed(2)).to.equal(j.total);",
+                  "});",
+                  "pm.test(\"each line_total is exactly 2dp\", () => j.transactions.forEach(t => pm.expect(t.line_total).to.match(/^-?\\d+\\.\\d{2}$/)));",
+                  "pm.test(\"invoice_number is derived from the pk as INV-nnnnn\", () => pm.expect(j.invoice_number).to.match(/^INV-\\d{5}$/));",
+                  "pm.test(\"one nested request wrote both line items\", () => pm.expect(j.transactions).to.have.lengthOf(2));",
+                  "pm.collectionVariables.set(\"money_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "total and invoice_number are read-only",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"total\": \"99999.99\",\n  \"invoice_number\": \"INV-99999\",\n  \"transactions\": [\n    {\n      \"description\": \"One\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"7.00\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"a client-supplied total is ignored - the server computes it\", () => pm.expect(j.total).to.equal(\"7.00\"));",
+                  "pm.test(\"a client-supplied invoice_number is ignored - it comes from the pk\", () => pm.expect(j.invoice_number).to.not.equal(\"INV-99999\"));",
+                  "pm.collectionVariables.set(\"readonly_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read the invoice back",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"every money value crosses the wire as a STRING, never a JSON number\", () => {",
+                  "    pm.expect(j.total, \"total\").to.be.a(\"string\");",
+                  "    j.transactions.forEach((t, i) => {",
+                  "        pm.expect(t.quantity, \"transactions[\" + i + \"].quantity\").to.be.a(\"string\");",
+                  "        pm.expect(t.unit_price, \"transactions[\" + i + \"].unit_price\").to.be.a(\"string\");",
+                  "        pm.expect(t.line_total, \"transactions[\" + i + \"].line_total\").to.be.a(\"string\");",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test(\"customer is expanded to an object on read\", () => {",
+                  "    pm.expect(j.customer).to.be.an(\"object\");",
+                  "    pm.expect(j.customer).to.have.property(\"name\");",
+                  "});",
+                  "pm.test(\"created_by is expanded to an object on read\", () => pm.expect(j.created_by).to.be.an(\"object\"));",
+                  "pm.test(\"total survives the round trip\", () => pm.expect(j.total).to.equal(\"300.00\"));",
+                  "const ids = j.transactions.map(t => t.id);",
+                  "pm.collectionVariables.set(\"line_ids_before\", JSON.stringify(ids));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update is replace-all: line item ids churn",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "description": "Documented in architecture.md: never hold a long-lived reference to a line-item id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Design work\",\n      \"quantity\": \"2.5\",\n      \"unit_price\": \"100.00\"\n    },\n    {\n      \"description\": \"Hosting\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"50.00\"\n    }\n  ],\n  \"issue_date\": \"2026-08-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const before = JSON.parse(pm.collectionVariables.get(\"line_ids_before\"));",
+                  "const after = j.transactions.map(t => t.id);",
+                  "pm.test(\"the same total is recomputed\", () => pm.expect(j.total).to.equal(\"300.00\"));",
+                  "pm.test(\"update() deleted and recreated the rows, so every line id changed\", () => {",
+                  "    pm.expect(after).to.have.lengthOf(before.length);",
+                  "    after.forEach(id => pm.expect(before).to.not.include(id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT with an empty transactions array wipes every line",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "description": "Sharp edge: [] means 'replace with nothing'. Omitting the key means 'leave alone' - see the next two requests.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"all line items are gone\", () => pm.expect(j.transactions).to.have.lengthOf(0));",
+                  "pm.test(\"an invoice with no lines totals 0.00, not null\", () => pm.expect(j.total).to.equal(\"0.00\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restore the line items",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Restored\",\n      \"quantity\": \"4\",\n      \"unit_price\": \"12.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"total recomputed to 4 x 12.50\", () => pm.expect(j.total).to.equal(\"50.00\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH without transactions leaves the lines untouched",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"patched by the postman suite\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"notes updated\", () => pm.expect(j.notes).to.equal(\"patched by the postman suite\"));",
+                  "pm.test(\"omitting `transactions` preserves them - unlike sending []\", () => pm.expect(j.transactions).to.have.lengthOf(1));",
+                  "pm.test(\"total is unchanged\", () => pm.expect(j.total).to.equal(\"50.00\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rounding: each line rounds to cents BEFORE the sum",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "description": "The exact worked example from docs/domain.md. This one cent is the difference between the dashboard and the invoice list agreeing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Quarter A\",\n      \"quantity\": \"0.25\",\n      \"unit_price\": \"0.50\"\n    },\n    {\n      \"description\": \"Quarter B\",\n      \"quantity\": \"0.25\",\n      \"unit_price\": \"0.50\"\n    },\n    {\n      \"description\": \"Quarter C\",\n      \"quantity\": \"0.25\",\n      \"unit_price\": \"0.50\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"each 0.25 x 0.50 = 0.125 rounds HALF UP to 0.13\", () => {",
+                  "    j.transactions.forEach(t => pm.expect(t.line_total).to.equal(\"0.13\"));",
+                  "});",
+                  "pm.test(\"total is 0.39 (round-then-sum), NOT 0.38 (sum-then-round)\", () => {",
+                  "    pm.expect(j.total).to.equal(\"0.39\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleting an invoice cascades to its line items",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{readonly_invoice_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Totals are computed from line items and never stored. This is the load-bearing rule of the system."
+    },
+    {
+      "name": "04 Dashboard",
+      "item": [
+        {
+          "name": "Dashboard shape and money contract",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "COERCE_DECIMAL_TO_STRING only applies to serializer fields, so the view pushes grand_total through a real DecimalField."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has every documented key\", () => pm.expect(j).to.have.all.keys(",
+                  "    \"invoice_count\", \"grand_total\", \"overdue_count\", \"customer_count\", \"recent_invoices\"));",
+                  "pm.test(\"grand_total is a STRING - a bare Decimal would render as a JSON number\", () => pm.expect(j.grand_total).to.be.a(\"string\"));",
+                  "pm.test(\"grand_total is 2dp\", () => pm.expect(j.grand_total).to.match(/^-?\\d+\\.\\d{2}$/));",
+                  "pm.test(\"counts are integers\", () => {",
+                  "    pm.expect(j.invoice_count).to.be.a(\"number\");",
+                  "    pm.expect(j.overdue_count).to.be.a(\"number\");",
+                  "    pm.expect(j.customer_count).to.be.a(\"number\");",
+                  "});",
+                  "pm.test(\"recent_invoices is capped at 5\", () => pm.expect(j.recent_invoices.length).to.be.at.most(5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "grand_total agrees with the sum of every invoice total",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "The highest-value assertion in the suite. Nothing else in the repo checks these two implementations against each other."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "// grand_total is a SECOND, independent implementation of the money rule: SQL",
+                  "// Round() inside Sum(), versus Python Decimal.quantize(ROUND_HALF_UP) in",
+                  "// Invoice.total. docs/domain.md asserts they agree; this is what verifies it.",
+                  "const base = pm.environment.get(\"base_url\");",
+                  "const token = pm.collectionVariables.get(\"admin_token\");",
+                  "const grand = j.grand_total;",
+                  "let cents = 0;",
+                  "let pages = 0;",
+                  "",
+                  "function walk(url, done) {",
+                  "    pm.sendRequest({ url: url, method: \"GET\", header: { Authorization: \"Token \" + token } },",
+                  "        function (err, res) {",
+                  "            if (err) { done(err); return; }",
+                  "            pages += 1;",
+                  "            const body = res.json();",
+                  "            body.results.forEach(inv => { cents += Math.round(parseFloat(inv.total) * 100); });",
+                  "            if (body.next) { walk(body.next, done); } else { done(null); }",
+                  "        });",
+                  "}",
+                  "",
+                  "walk(base + \"/invoices/\", function (err) {",
+                  "    pm.test(\"walked the paginated invoice list without error\", () => pm.expect(err).to.equal(null));",
+                  "    pm.test(\"SQL grand_total === Python sum of Invoice.total over \" + pages + \" page(s)\", () => {",
+                  "        pm.expect((cents / 100).toFixed(2)).to.equal(grand);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Snapshot grand_total before a known change",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"gt_before\", pm.response.json().grand_total);",
+                  "pm.collectionVariables.set(\"ic_before\", pm.response.json().invoice_count);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add an invoice worth exactly 42.42",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Delta probe\",\n      \"quantity\": \"2\",\n      \"unit_price\": \"21.21\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"2 x 21.21 = 42.42\", () => pm.expect(j.total).to.equal(\"42.42\"));",
+                  "pm.collectionVariables.set(\"delta_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "grand_total moved by exactly 42.42",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "A delta assertion stays meaningful as the dev database grows, unlike a fixed expected total."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const before = Math.round(parseFloat(pm.collectionVariables.get(\"gt_before\")) * 100);",
+                  "const after = Math.round(parseFloat(j.grand_total) * 100);",
+                  "pm.test(\"delta is exactly 4242 cents\", () => pm.expect(after - before).to.equal(4242));",
+                  "pm.test(\"invoice_count went up by one\", () => pm.expect(j.invoice_count).to.equal(pm.collectionVariables.get(\"ic_before\") + 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove the probe invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{delta_invoice_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "grand_total returned to its previous value",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"grand_total is back where it started\", () => pm.expect(j.grand_total).to.equal(pm.collectionVariables.get(\"gt_before\")));",
+                  "pm.test(\"invoice_count is back where it started\", () => pm.expect(j.invoice_count).to.equal(pm.collectionVariables.get(\"ic_before\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard is scoped for STAFF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "DashboardView calls the same scope_to_role() the viewsets use. customer_count is global by design."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const base = pm.environment.get(\"base_url\");",
+                  "const token = pm.collectionVariables.get(\"staff_token\");",
+                  "pm.sendRequest({ url: base + \"/invoices/\", method: \"GET\", header: { Authorization: \"Token \" + token } },",
+                  "    function (err, res) {",
+                  "        pm.test(\"dashboard invoice_count matches the STAFF-scoped invoice list\", () => {",
+                  "            pm.expect(err).to.equal(null);",
+                  "            pm.expect(j.invoice_count).to.equal(res.json().count);",
+                  "        });",
+                  "    });",
+                  "pm.test(\"customer_count is deliberately NOT scoped - customers have no owner\", () => {",
+                  "    pm.expect(j.customer_count).to.equal(pm.collectionVariables.get(\"baseline_customer_count\") + 2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard is unscoped for VIEWER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"VIEWER sees the whole set, like ADMIN\", () => {",
+                  "    pm.expect(j.invoice_count).to.equal(pm.collectionVariables.get(\"ic_before\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard requires authentication",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Including the one assertion nothing else in the repo makes: that the SQL grand_total agrees with the Python Invoice.total."
+    },
+    {
+      "name": "05 Error contract",
+      "item": [
+        {
+          "name": "Deleting a referenced customer is 400, never 500",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/{{customer_id}}/",
+            "description": "config.exceptions.api_exception_handler catches ProtectedError globally."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"not an unhandled 500\", () => pm.expect(pm.response.code).to.not.be.oneOf([500, 502, 503]));",
+                  "pm.test(\"ProtectedError became a readable message\", () => {",
+                  "    pm.expect(j.detail).to.match(/^Cannot delete this record because it is referenced by \\d+ invoices?\\.$/);",
+                  "});",
+                  "pm.test(\"the message names the referencing model\", () => pm.expect(j.detail).to.contain(\"invoice\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create a throwaway STAFF user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/",
+            "description": "Created here so the user-level ProtectedError can be tested without risking a seeded account.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-temp@invoice.local\",\n  \"full_name\": \"Postman Temp\",\n  \"role\": \"STAFF\",\n  \"password\": \"TempPass123!xyz\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"the password is write-only and never echoed\", () => pm.expect(j).to.not.have.property(\"password\"));",
+                  "pm.test(\"role was accepted - /api/users/ is the only place role is writable\", () => pm.expect(j.role).to.equal(\"STAFF\"));",
+                  "pm.collectionVariables.set(\"temp_user_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as the throwaway user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-temp@invoice.local\",\n  \"password\": \"TempPass123!xyz\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));pm.collectionVariables.set(\"temp_token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The throwaway user owns an invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{temp_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Owned by temp\",\n      \"quantity\": \"1\",\n      \"unit_price\": \"5.00\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));pm.collectionVariables.set(\"temp_invoice_id\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deleting a user who owns invoices is 400, never 500",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/users/{{temp_user_id}}/",
+            "description": "Any new PROTECT relationship is covered automatically - no per-viewset handling needed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Invoice.created_by is PROTECT, so the same global handler applies\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.match(/^Cannot delete this record because it is referenced by \\d+ invoices?\\.$/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Creating a user without a password is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nopass@invoice.local\",\n  \"full_name\": \"No Password\",\n  \"role\": \"STAFF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));pm.test(\"password is required on create\", () => pm.expect(JSON.stringify(pm.response.json())).to.contain(\"password\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A weak password is rejected by Django's validators",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"weak@invoice.local\",\n  \"full_name\": \"Weak\",\n  \"role\": \"STAFF\",\n  \"password\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));pm.test(\"validate_password ran\", () => pm.expect(pm.response.json()).to.have.property(\"password\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown invoice id is 404 with a detail body",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/99999999/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));pm.test(\"{detail} shape\", () => pm.expect(pm.response.json()).to.have.property(\"detail\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing required field is a field-keyed 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "The frontend surfaces both DRF shapes verbatim - {detail} and {field: [...]}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"transactions\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "const j = pm.response.json();",
+                  "pm.test(\"due_date is flagged as required\", () => {",
+                  "    pm.expect(j).to.have.property(\"due_date\");",
+                  "    pm.expect(j.due_date).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unsupported method on the dashboard is 405",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 405\", () => pm.response.to.have.status(405));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "ProtectedError becomes a readable 400, never an unhandled 500, and DRF's two error shapes both appear."
+    },
+    {
+      "name": "06 Filtering, ordering and pagination",
+      "item": [
+        {
+          "name": "Paginated envelope with a page size of 20",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"PageNumberPagination envelope\", () => pm.expect(j).to.have.all.keys(\"count\", \"next\", \"previous\", \"results\"));",
+                  "pm.test(\"at most 20 rows per page\", () => pm.expect(j.results.length).to.be.at.most(20));",
+                  "pm.test(\"first page has no previous\", () => pm.expect(j.previous).to.equal(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Out-of-range page is 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?page=9999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter: overdue=true",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?overdue=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const today = new Date().toISOString().slice(0, 10);",
+                  "pm.test(\"every result is genuinely past its due date\", () => {",
+                  "    j.results.forEach(inv => pm.expect(inv.due_date < today, inv.invoice_number + \" due \" + inv.due_date).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter: mine=true as ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?mine=true",
+            "description": "?mine=true only narrows anything for ADMIN and VIEWER - STAFF is already scoped."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const email = pm.environment.get(\"admin_email\");",
+                  "pm.test(\"only the requesting user's invoices come back\", () => j.results.forEach(inv => pm.expect(inv.created_by.email).to.equal(email)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter: by customer id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?customer={{customer_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"every result belongs to the fixture customer\", () => {",
+                  "    const want = String(pm.collectionVariables.get(\"customer_id\"));",
+                  "    j.results.forEach(inv => pm.expect(String(inv.customer.id)).to.equal(want));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search invoices by customer name",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?search=Postman Fixture",
+            "description": "search_fields covers customer__name, customer__company_name and notes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the fixture customer's invoices are found\", () => pm.expect(j.count).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ordering: due_date ascending",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?ordering=due_date"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"results are sorted by due_date ascending\", () => {",
+                  "    const d = j.results.map(i => i.due_date);",
+                  "    pm.expect(d).to.eql([...d].sort());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ordering: due_date descending",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?ordering=-due_date"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"results are sorted by due_date descending\", () => {",
+                  "    const d = j.results.map(i => i.due_date);",
+                  "    pm.expect(d).to.eql([...d].sort().reverse());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ordering by total is not offered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?ordering=total",
+            "description": "`total` is a Python property with no column, so it is absent from ordering_fields. Sorting by total is not available."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the unsupported ordering key is ignored, not an error\", () => pm.expect(pm.response.code).to.equal(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search customers by company name",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/?search=Postman"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"finds the fixture customers\", () => pm.expect(j.count).to.be.at.least(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter transactions by parent invoice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/?invoice={{staff_invoice_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"every line belongs to that invoice\", () => {",
+                  "    const want = String(pm.collectionVariables.get(\"staff_invoice_id\"));",
+                  "    j.results.forEach(t => pm.expect(String(t.invoice)).to.equal(want));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 PDF extract",
+      "item": [
+        {
+          "name": "Extract requires authentication",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/invoices/extract/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "note",
+                  "value": "no file",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VIEWER cannot reach extract",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{viewer_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/extract/",
+            "description": "extract is an @action, so it inherits RolePermission for free - a POST, so VIEWER is refused.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "note",
+                  "value": "no file",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"RolePermission refuses the POST before any file is read\", () => pm.expect(pm.response.code).to.equal(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract with no file is a readable 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/extract/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "note",
+                  "value": "deliberately no file field",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"names the expected field\", () => pm.expect(pm.response.json().detail).to.equal(\"No file was uploaded. Send one PDF as `file`.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A non-PDF is rejected on its magic bytes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/extract/",
+            "description": "The server checks for the %PDF- prefix rather than trusting the extension or the client's content type. Needs postman/fixtures/not-a-pdf.txt - run newman with --working-dir postman/fixtures.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "not-a-pdf.txt"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"rejected before any model call - this costs nothing\", () => {",
+                  "    pm.expect(pm.response.json().detail).to.contain(\"is not a PDF\");",
+                  "});",
+                  "pm.test(\"never a 500\", () => pm.expect(pm.response.code).to.equal(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Rejection paths only. All four short-circuit before extract_invoice_fields, so none of them calls OpenAI or costs anything."
+    },
+    {
+      "name": "08 Known gaps",
+      "item": [
+        {
+          "name": "KNOWN GAP: a negative quantity is accepted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "ASSERTS TODAY'S BEHAVIOUR. Neither the model nor the serializer bounds quantity or unit_price, and the migrations carry no CheckConstraint. Note also that frontend lib/money.ts uses Math.round, which gives -0.01 here - the browser preview and the saved total disagree by a cent. If a validator is added, this test goes red: that is the signal to update it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"due_date\": \"2026-09-30\",\n  \"transactions\": [\n    {\n      \"description\": \"Negative line\",\n      \"quantity\": \"-0.15\",\n      \"unit_price\": \"0.10\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"no validator rejects a negative quantity, so the invoice saves\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"the server rounds -0.015 HALF UP (away from zero) to -0.02\", () => pm.expect(j.transactions[0].line_total).to.equal(\"-0.02\"));",
+                  "pm.collectionVariables.set(\"gap_negative_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "KNOWN GAP: due_date before issue_date is accepted",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/",
+            "description": "ASSERTS TODAY'S BEHAVIOUR. Nothing enforces due_date >= issue_date, so such rows inflate the dashboard's overdue_count.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customer_id}}\",\n  \"issue_date\": \"2026-12-31\",\n  \"due_date\": \"2020-01-01\",\n  \"transactions\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"a backwards invoice saves cleanly - InvoiceSerializer has no validate()\", () => pm.expect(pm.response.code).to.equal(201));",
+                  "pm.test(\"and it then counts as overdue\", () => pm.expect(j.due_date < j.issue_date).to.be.true);",
+                  "pm.collectionVariables.set(\"gap_backwards_invoice_id\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "KNOWN GAP: searching by invoice number finds nothing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?search=INV-00001",
+            "description": "ASSERTS TODAY'S BEHAVIOUR. InvoiceList.tsx placeholder reads 'Search invoice number or customer', but search_fields is (customer__name, customer__company_name, notes) and there is no invoice_number filter anywhere. invoice_number is derived from the pk and has no column, so supporting this means parsing the digits back to a pk in the filter layer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"the UI advertises this search but the API cannot do it\", () => pm.expect(j.count).to.equal(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "KNOWN GAP: overdue=false is a silent no-op",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?overdue=false",
+            "description": "ASSERTS TODAY'S BEHAVIOUR. filter_overdue returns the queryset untouched when value is falsy, so ?overdue=false reads as 'no filter' rather than 'not overdue'. Same for ?mine=false."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "const base = pm.environment.get(\"base_url\");",
+                  "const token = pm.collectionVariables.get(\"admin_token\");",
+                  "pm.sendRequest({ url: base + \"/invoices/\", method: \"GET\", header: { Authorization: \"Token \" + token } },",
+                  "    function (err, res) {",
+                  "        pm.test(\"?overdue=false returns the UNFILTERED set, not the not-overdue set\", () => {",
+                  "            pm.expect(err).to.equal(null);",
+                  "            pm.expect(j.count).to.equal(res.json().count);",
+                  "        });",
+                  "    });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fetch an invoice for the round-trip attempt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"roundtrip_body\", pm.response.text());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "KNOWN GAP: a GET response cannot be PUT straight back",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/invoices/{{money_invoice_id}}/",
+            "description": "ASSERTS TODAY'S BEHAVIOUR. to_representation() expands customer and created_by on read; the writable field is a PrimaryKeyRelatedField. A client that round-trips a GET into a PUT has to strip them first.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{roundtrip_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"reads expand customer to an object, but writes want a primary key\", () => {",
+                  "    pm.expect(pm.response.json().customer[0]).to.equal(\"Incorrect type. Expected pk value, received dict.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Tests that assert today's behaviour where it is wrong. Green now; red when fixed."
+    },
+    {
+      "name": "99 Teardown",
+      "item": [
+        {
+          "name": "Delete every invoice this run created",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/invoices/?customer={{customer_id}}",
+            "description": "Line items go with them - Transaction.invoice is CASCADE."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "// Every invoice the suite creates points at the fixture customer, so listing by",
+                  "// customer finds them all - including the ones created by STAFF and by the",
+                  "// throwaway user, which ADMIN can see because ADMIN is unscoped.",
+                  "const base = pm.environment.get(\"base_url\");",
+                  "const token = pm.collectionVariables.get(\"admin_token\");",
+                  "const auth = { Authorization: \"Token \" + token };",
+                  "let ids = [];",
+                  "",
+                  "function collect(url, done) {",
+                  "    pm.sendRequest({ url: url, method: \"GET\", header: auth }, function (err, res) {",
+                  "        if (err) { done(err); return; }",
+                  "        const b = res.json();",
+                  "        b.results.forEach(i => ids.push(i.id));",
+                  "        if (b.next) { collect(b.next, done); } else { done(null); }",
+                  "    });",
+                  "}",
+                  "",
+                  "function deleteFrom(i, done) {",
+                  "    if (i >= ids.length) { done(null); return; }",
+                  "    pm.sendRequest({ url: base + \"/invoices/\" + ids[i] + \"/\", method: \"DELETE\", header: auth },",
+                  "        function (err, res) {",
+                  "            if (err) { done(err); return; }",
+                  "            if (res.code !== 204) { done(new Error(\"invoice \" + ids[i] + \" -> \" + res.code)); return; }",
+                  "            deleteFrom(i + 1, done);",
+                  "        });",
+                  "}",
+                  "",
+                  "collect(base + \"/invoices/?customer=\" + pm.collectionVariables.get(\"customer_id\"), function (err) {",
+                  "    if (err) { pm.test(\"listed the run's invoices\", () => pm.expect.fail(String(err))); return; }",
+                  "    deleteFrom(0, function (derr) {",
+                  "        pm.test(\"deleted all \" + ids.length + \" invoice(s) created by this run\", () => pm.expect(derr).to.equal(null));",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the throwaway user",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/users/{{temp_user_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"deletable now that it owns no invoices - the PROTECT is released\", () => pm.expect(pm.response.code).to.equal(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the fixture customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/{{customer_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"no longer protected once its invoices are gone\", () => pm.expect(pm.response.code).to.equal(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete the STAFF-created customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/customers/{{staff_customer_id}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The database is back to its starting state",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/dashboard/",
+            "description": "This is what makes the suite re-runnable: a second consecutive run must be just as green as the first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"invoice_count is back to the baseline captured in 00 Setup\", () => {",
+                  "    pm.expect(j.invoice_count).to.equal(pm.collectionVariables.get(\"baseline_invoice_count\"));",
+                  "});",
+                  "pm.test(\"customer_count is back to the baseline captured in 00 Setup\", () => {",
+                  "    pm.expect(j.customer_count).to.equal(pm.collectionVariables.get(\"baseline_customer_count\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Removes everything the run created and proves the baseline is restored."
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Applies to every request in the collection: the repo's own rule is that no",
+          "// endpoint may ever return an unhandled 5xx - ProtectedError and ExtractionError",
+          "// are both explicitly mapped to 400.",
+          "pm.test(\"no server error (5xx)\", function () {",
+          "    pm.expect(pm.response.code, pm.request.method + ' ' + pm.request.url.getPath()).to.be.below(500);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "staff_token",
+      "value": ""
+    },
+    {
+      "key": "viewer_token",
+      "value": ""
+    },
+    {
+      "key": "temp_token",
+      "value": ""
+    },
+    {
+      "key": "admin_user_id",
+      "value": ""
+    },
+    {
+      "key": "staff_user_id",
+      "value": ""
+    },
+    {
+      "key": "viewer_user_id",
+      "value": ""
+    },
+    {
+      "key": "temp_user_id",
+      "value": ""
+    },
+    {
+      "key": "customer_id",
+      "value": ""
+    },
+    {
+      "key": "staff_customer_id",
+      "value": ""
+    },
+    {
+      "key": "admin_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "staff_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "money_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "readonly_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "forged_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "delta_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "temp_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "gap_negative_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "gap_backwards_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "standalone_txn_id",
+      "value": ""
+    },
+    {
+      "key": "line_ids_before",
+      "value": ""
+    },
+    {
+      "key": "roundtrip_body",
+      "value": ""
+    },
+    {
+      "key": "gt_before",
+      "value": ""
+    },
+    {
+      "key": "ic_before",
+      "value": ""
+    },
+    {
+      "key": "baseline_invoice_count",
+      "value": ""
+    },
+    {
+      "key": "baseline_customer_count",
+      "value": ""
+    }
+  ]
+}

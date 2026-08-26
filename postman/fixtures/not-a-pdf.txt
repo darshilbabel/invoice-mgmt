@@ -1,0 +1,4 @@
+This is deliberately not a PDF.
+The extract endpoint checks for the %PDF- magic bytes rather than trusting
+the file extension or the client-supplied content type, so uploading this
+must produce a readable 400 and must never reach OpenAI.

@@ -32,3 +32,13 @@ npm-debug.log*
 
 # Claude Code local overrides (keep the shared settings.json, ignore local one)
 .claude/settings.local.json
+
+# Vendored QA skill pack (petrkindlmann/qa-skills). The install is restorable from
+# skills-lock.json, which IS committed — don't commit 2MB of third-party files.
+# .claude/skills/ is mostly symlinks into .agents/skills/; ui-test is ours, keep it.
+.agents/
+.claude/skills/*
+!.claude/skills/ui-test/
+
+# Playwright MCP scratch output — console logs and page snapshots from browser runs.
+.playwright-mcp/
