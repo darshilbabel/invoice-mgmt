@@ -179,11 +179,27 @@ Recorded here because they change the shape of the system, not just a model fiel
 `domain.md`).
 
 1. **A fourth model, `Customer`** — see `domain.md`.
-2. **No automated tests.** Verification is `manage.py check`, `makemigrations --check --dry-run`,
-   the Django shell, and `curl` against a running server. Consequence: the computed-total rule and
-   the role-scoping rules in `conventions.md` have no regression safety net. Worth revisiting if
-   the codebase keeps growing — see `docs/specs/` for how a new feature should state its own
-   verification plan given this constraint.
+2. **No automated tests — narrowly reversed 2026-08-25.** *Original decision:* verification is
+   `manage.py check`, `makemigrations --check --dry-run`, the Django shell, and `curl` against a
+   running server. Consequence: the computed-total rule and the role-scoping rules in
+   `conventions.md` have no regression safety net.
+
+   **Reversed for exactly the two rules that sentence names, and nothing else.**
+   `billing.Transaction.line_total`, `billing.Invoice.total`, the dashboard's Round-inside-Sum
+   aggregate and `accounts.permissions.scope_to_role` get unit tests under Django's built-in
+   `TestCase`. Views, routing, the OpenAI adapter and the whole frontend keep the original
+   decision — they are verified by the Postman/Newman suite (`postman/`, 92 requests, 299
+   assertions) and manual browser passes via the `ui-test` skill.
+
+   **The reversal costs zero new dependencies.** `accounts/tests.py` and `billing/tests.py`
+   already import `django.test.TestCase`; nothing is added to `requirements.txt`. `pytest-django`
+   was considered and rejected on that basis alone.
+
+   **What it still does not buy:** no line-coverage percentage (`coverage` is a pip dependency,
+   deliberately deferred in favour of a named-case checklist) and no frontend unit tests
+   (`vitest` is an npm dependency awaiting approval). Full reasoning, the target pyramid and the
+   phased plan are in `docs/qa-strategy.md`.
+
 3. **A `/api/dashboard/` endpoint**, not named in the original brief — needed once the `status`
    field was dropped and the dashboard had nothing else to aggregate.
 4. **A `/customers` page**, reversing an earlier decision to manage customers only through the
