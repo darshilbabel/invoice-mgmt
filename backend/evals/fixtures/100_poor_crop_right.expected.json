@@ -1,0 +1,44 @@
+{
+  "_verified": true,
+  "_note": "Hand-verified 2026-08-25 against the undegraded original (~/Downloads/Sample_Invoices/775251047-Kentucky-Dental-invoice.pdf), of which this file is a degraded variant. The degradation is a hard crop of the right edge. Verified at 300 DPI on the cropped page itself: the trailing '6' of the invoice number is GONE (the page ends immediately after '0032170'), the final '4' of 'Jul 05, 2024' is sliced through but still readable, and the Amount Due row loses its last '0'. The TOTAL row ($1,260.00), the Qty and Rate columns and the line Amount all survive intact.\n\nGolden convention, stated because it decides two fields: this file records WHAT IS LEGIBLE ON THIS PAGE, not what the undamaged original says. The extractor cannot see a character the crop removed, so scoring it against '00321706' would penalise a correct reading of the document it was actually handed. The true underlying number is 00321706 and the true date is 2024-07-05; source_invoice_number below is therefore deliberately '0032170', and both fields are listed in `ambiguous` because a careful human reader would also hesitate over them and should flag them for review.",
+  "source_pdf": "100_poor_crop_right.pdf",
+  "page_count": 1,
+
+  "issuer": {
+    "name": "Northern Kentucky Dental care",
+    "email": null,
+    "address": "270 Alexandria pike\nHighland Heights , KY 41076\nU.S.A"
+  },
+  "bill_to": {
+    "name": "Kimberly Carius",
+    "email": null,
+    "address": "29 Brumble Avenue\nHighland Heights, KY 41076\nU.S.A"
+  },
+  "customer_absent": false,
+
+  "source_invoice_number": "0032170",
+  "issue_date": "2024-07-05",
+  "due_date": null,
+
+  "printed_total": "1260.00",
+  "printed_total_absent": false,
+
+  "line_items": [
+    {
+      "description": "Dental Examination  A Prescription has been written out to the patient for denture repair and relining services",
+      "quantity": "1.00",
+      "unit_price": "1260.00"
+    }
+  ],
+  "forbidden_descriptions": ["Sub Total", "TOTAL", "Amount Due"],
+
+  "ambiguous": {
+    "source_invoice_number": "The right crop cuts the page immediately after '0032170'. Nothing on the page says whether a further digit followed, so any reading of this field is a guess about a character that is not there.",
+    "issue_date": "'Jul 05, 2024' has its final '4' sliced vertically by the crop. 2024 is the only plausible reading of what survives, but the glyph is damaged and a reader should be told so."
+  },
+
+  "notes_source_text": "Invoice# 0032170. Northern Kentucky Dental care, 270 Alexandria pike, Highland Heights , KY 41076, U.S.A. Bill To: Kimberly Carius, 29 Brumble Avenue, Highland Heights, KY 41076, U.S.A. Date : Jul 05, 2024. Sub Total 1260.00. TOTAL $1,260.00. Amount Due $1,260.00. Notes: It was great doing business with you. Terms & Conditions: For any questions or further clarification regarding your payment or how to go about it, please contact our finance office at the front desk. Thank you for choosing Northern Kentucky Dental Care. Crafted with ease using Zoho Invoice. Visit zoho.com/invoice to create truly professional invoices.",
+
+  "rounding_divergent": false,
+  "expect_error": null
+}

@@ -1,0 +1,35 @@
+{
+  "_verified": true,
+  "_note": "Hand-verified 2026-08-25 against the undegraded original (~/Downloads/Sample_Invoices/775251047-Kentucky-Dental-invoice.pdf), of which this file is a degraded variant. The degradation is an augraphy scan-lines pass, and it is destructive in a way the crop fixtures are not: it has reduced every dark glyph on the page to a single narrow vertical stripe. Checked at 300 DPI with full autocontrast — you can count the characters in '$1,260.00' and see its decimal point, and you cannot identify one digit of it. Same for the invoice number, the date, the Qty/Rate/Amount cells and both parties' names and addresses.\n\nTwo things did survive: the green letterhead logo, which still reads NORTHERN KENTUCKY DENTAL CARE, and the line-item table's header band, which is white-on-black and so untouched by a filter that only attacks dark ink ('# / Item Description / Qty / Rate / Amount').\n\nSo the correct outcome is a REFUSAL, and that is what expect_error records. This is the suite's first fixture whose right answer is that nothing comes back. Note it is not literally the has_content:false case the prompt describes — the page is legibly an invoice and legibly from this supplier. What is unreadable is every VALUE on it. Extracting from it would mean inventing the amounts, and returning the letterhead as the customer would create a permanent Customer row for the supplier itself (docs/domain.md, on_delete=PROTECT). Refusing is right; see the report for the one thing that is off about how the refusal reads to the user.\n\nissuer.name is filled from the logo because it is genuinely legible. issuer.email and issuer.address are left null because they are NOT legible on this page — the same 'record what is legible here, not what the original said' convention 100_poor_crop_right.expected.json states. bill_to is all-null for the same reason: the addressed party is on the page and cannot be read.\n\ncustomer_absent is true in the sense this file needs it — nothing should come back — rather than meaning the invoice names no customer. It does name one. Nobody can read it.",
+  "source_pdf": "113_augraphy_scan_lines.pdf",
+  "page_count": 1,
+
+  "issuer": {
+    "name": "Northern Kentucky Dental care",
+    "email": null,
+    "address": null
+  },
+  "bill_to": {
+    "name": null,
+    "email": null,
+    "address": null
+  },
+  "customer_absent": true,
+
+  "source_invoice_number": null,
+  "issue_date": null,
+  "due_date": null,
+
+  "printed_total": null,
+  "printed_total_absent": false,
+
+  "line_items": [],
+  "forbidden_descriptions": [],
+
+  "ambiguous": {},
+
+  "notes_source_text": "",
+
+  "rounding_divergent": false,
+  "expect_error": { "reason": "no_text" }
+}

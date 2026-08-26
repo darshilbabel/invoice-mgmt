@@ -19,6 +19,24 @@ in `domain.md`; service boundaries live in `architecture.md`.
 sent to the model as a file, so there is no PDF parser and no OCR library, and there should never
 be one — if extraction stops working, fix the prompt or the model, don't add `pypdf`.
 
+### Eval-only Python dependencies
+
+`deepeval` and `anthropic` were approved on 2026-08-25 for the extraction eval suite
+(`backend/evals/`), which scores `billing/extraction.py` against hand-verified invoice PDFs —
+the row `docs/qa-strategy.md` § 4 currently marks *"billable and nondeterministic; rejection paths
+only"*. `anthropic` is there because the LLM judge is `claude-sonnet-5`, and because deepeval
+declares it as a dev-only dependency and so does not install it.
+
+They are pinned in **`backend/evals/requirements.txt`**, not `backend/requirements.txt`, and that
+separation is the point: nothing in `backend/evals/` is imported by the application, and the app
+must keep running for someone who has never installed them. Adding either to the application's
+requirements would be a mistake, not a tidy-up.
+
+Two consequences of installing them into the shared `.venv` rather than a separate one, both
+accepted knowingly: deepeval registers a `pytest11` plugin entry point that loads into every
+pytest run in that venv, and its settings layer will **write** to a dotenv file in the working
+directory if you run `deepeval set-*` — from `backend/` that means `backend/.env`. Don't.
+
 **The Django pin is a ceiling, not a preference.** The local PostgreSQL is 14.18; Django 6.1
 declares `minimum_database_version = (15,)` and refuses to connect. Raising the pin means
 upgrading PostgreSQL first — and that server hosts other, unrelated databases. Do not bump it

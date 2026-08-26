@@ -1,0 +1,41 @@
+{
+  "_verified": true,
+  "_note": "Hand-verified 2026-08-25 against the undegraded original (~/Downloads/Sample_Invoices/775251047-Kentucky-Dental-invoice.pdf), of which this file is a degraded variant. The degradation here is a corner crop: a thin bevel off the page edges. At 130 DPI every field is still fully legible, nothing is clipped, and no field is ambiguous. This is the control case for 100_poor_crop_right, whose crop actually eats characters.",
+  "source_pdf": "101_poor_crop_corner.pdf",
+  "page_count": 1,
+
+  "issuer": {
+    "name": "Northern Kentucky Dental care",
+    "email": null,
+    "address": "270 Alexandria pike\nHighland Heights , KY 41076\nU.S.A"
+  },
+  "bill_to": {
+    "name": "Kimberly Carius",
+    "email": null,
+    "address": "29 Brumble Avenue\nHighland Heights, KY 41076\nU.S.A"
+  },
+  "customer_absent": false,
+
+  "source_invoice_number": "00321706",
+  "issue_date": "2024-07-05",
+  "due_date": null,
+
+  "printed_total": "1260.00",
+  "printed_total_absent": false,
+
+  "line_items": [
+    {
+      "description": "Dental Examination  A Prescription has been written out to the patient for denture repair and relining services",
+      "quantity": "1.00",
+      "unit_price": "1260.00"
+    }
+  ],
+  "forbidden_descriptions": ["Sub Total", "TOTAL", "Amount Due"],
+
+  "ambiguous": {},
+
+  "notes_source_text": "Invoice# 00321706. Northern Kentucky Dental care, 270 Alexandria pike, Highland Heights , KY 41076, U.S.A. Bill To: Kimberly Carius, 29 Brumble Avenue, Highland Heights, KY 41076, U.S.A. Date : Jul 05, 2024. Sub Total 1260.00. TOTAL $1,260.00. Amount Due $1,260.00. Notes: It was great doing business with you. Terms & Conditions: For any questions or further clarification regarding your payment or how to go about it, please contact our finance office at the front desk. Thank you for choosing Northern Kentucky Dental Care. Crafted with ease using Zoho Invoice. Visit zoho.com/invoice to create truly professional invoices.",
+
+  "rounding_divergent": false,
+  "expect_error": null
+}

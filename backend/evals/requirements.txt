@@ -1,0 +1,21 @@
+# Eval-only dependencies. Deliberately NOT in backend/requirements.txt: nothing here
+# is imported by the application, and installing them is not a prerequisite for
+# running it. Approved 2026-08-25 — recorded in docs/conventions.md § Dependencies.
+#
+#   pip install -r backend/evals/requirements.txt
+#
+# Install anthropic first if doing it by hand: a resolver conflict then surfaces on a
+# two-package problem rather than inside a 35-package solve.
+
+# The judge. deepeval declares `anthropic` as a DEV dependency only, so
+# `pip install deepeval` does not bring it — it has to be named here or
+# AnthropicModel.load_model() raises on first use.
+anthropic
+
+# The eval framework. Pinned: 4.x renamed LLMTestCaseParams -> SingleTurnParams and
+# changed the model registry, both of which this suite depends on.
+deepeval==4.2.0
+
+# deepeval's CLI runs through pytest, and the free (non-billable) layers of this
+# suite are plain pytest. Pulled in by deepeval anyway; named here so it is explicit.
+pytest

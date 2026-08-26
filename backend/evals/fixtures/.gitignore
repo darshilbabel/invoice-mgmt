@@ -1,0 +1,20 @@
+# Fixture PDFs are NOT committed by default.
+#
+# A real invoice carries a company name, a postal address, an email and a set of
+# amounts. Committing one puts all of that in git history permanently, where
+# rewriting it later is a force-push across every clone. That should be a
+# deliberate decision someone makes per document, not the default this directory
+# hands them.
+#
+# The goldens (*.expected.json) ARE committed: they are what makes a run
+# reproducible and reviewable, and they contain only what you chose to write in
+# them. dataset.py fails with a readable message when a golden is here but its PDF
+# is not, so a fresh clone is told what is missing rather than quietly scoring less.
+#
+# To commit one anyway:  git add -f evals/fixtures/that-one.pdf
+
+*.pdf
+
+# Extraction results, keyed by pdf + model + prompt + schema. Regenerable, and
+# they hold the same invoice data the PDFs do.
+.cache/
